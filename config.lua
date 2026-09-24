@@ -9,9 +9,11 @@ return {
   },
 
   -- Sides and the TTS seat colour that controls each one.
+  -- Red deploys on the south edge (Zone A) facing north, Blue on the north
+  -- edge (Zone B) facing south. spawn_z is where new ships are lined up.
   sides = {
-    { id = "red",  name = "Red",  seat = "Red"  },
-    { id = "blue", name = "Blue", seat = "Blue" },
+    { id = "red",  name = "Red",  seat = "Red",  heading = 0,   spawn_z = -20, tint = { 0.72, 0.16, 0.16 } },
+    { id = "blue", name = "Blue", seat = "Blue", heading = 180, spawn_z = 20,  tint = { 0.16, 0.36, 0.75 } },
   },
 
   wind = {
@@ -76,6 +78,12 @@ return {
     max_rerolls = 50,  -- safety cap; ties on total and running ships re-roll
   },
 
+  ship = {
+    full_pct = 50,      -- crew at or above this % of base crew: full strength
+    abandoned_pct = 25, -- at or below: abandoned
+    wreck_hull = -2,    -- hull remaining at or below this: wreck, removed
+  },
+
   movement = {
     min_move = 2,
     idle_drift = 2,       -- active ship that elects not to move
@@ -104,8 +112,9 @@ return {
   },
 
   tts = {
-    stage1_test_ships = 3, -- stand-in ships per side until Stage 2 adds real ones
     log_lines = 8,
+    label_scale = 0.5, -- size of ship name labels; tune in game
+    done_scale = 1.5,  -- size of the Done button on ship bases
     wind_indicator = { x = 30, z = 18, length = 5 },
   },
 }

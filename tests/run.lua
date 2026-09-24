@@ -10,6 +10,8 @@ local FILES = {
   "tests.test_wind",
   "tests.test_initiative",
   "tests.test_turn",
+  "tests.test_data",
+  "tests.test_ship",
 }
 
 local filter = arg and arg[1]

@@ -7,6 +7,7 @@ Scripted TTS version of Sail & Broadside v0.8.2.4. See [DESIGN.md](DESIGN.md) fo
 | Folder | Contents |
 | --- | --- |
 | `rules/` | Pure Lua game rules, no TTS calls |
+| `data/` | Faction ships, crews and bonuses |
 | `tts/` | TTS glue: UI, drawing, Global script entry (`tts/global.lua`) |
 | `tests/` | Unit tests for `rules/` |
 | `tools/` | Bundler and TTS smoke test |

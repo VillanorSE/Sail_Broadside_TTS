@@ -4,7 +4,7 @@
 local script = (arg and arg[0]) or "tools/tts_smoke.lua"
 local root = script:match("^(.*)[/\\]tools[/\\][^/\\]*$") or "."
 
-local messages, ui_values, ui_attrs, lines = {}, {}, {}, nil
+local messages, ui_values, ui_attrs, lines, xml = {}, {}, {}, nil, nil
 
 local function deep_copy(v)
   if type(v) ~= "table" then return v end
@@ -16,7 +16,7 @@ end
 -- Stand-ins for the TTS globals the script uses.
 JSON = { encode = function(t) return deep_copy(t) end, decode = function(t) return deep_copy(t) end }
 UI = {
-  setXml = function(xml) assert(xml:find("sbPanel"), "panel missing from XML") end,
+  setXml = function(x) xml = x end,
   setValue = function(id, v) ui_values[id] = v end,
   setAttribute = function(id, k, v) ui_attrs[id .. "." .. k] = v end,
 }
@@ -26,41 +26,99 @@ function broadcastToAll(msg) messages[#messages + 1] = msg end
 function broadcastToColor(msg) messages[#messages + 1] = "(private) " .. msg end
 function getSeatedPlayers() return { "Red", "Blue" } end
 
-local spawned = {}
-function getObjectFromGUID(guid) return spawned[guid] end
+local host = { color = "White", host = true }
+local red = { color = "Red", host = false }
+local blue = { color = "Blue", host = false }
+Player = { White = host, Red = red, Blue = blue }
+
+local objects, spawn_count = {}, 0
+function getObjectFromGUID(guid) return objects[guid] end
 function spawnObject(p)
-  local guid = "g" .. (#spawned + 1)
-  local o = { scale = { x = 1, y = 1, z = 1 } }
+  spawn_count = spawn_count + 1
+  local guid = "g" .. spawn_count
+  local o = {
+    scale = { x = 1, y = 1, z = 1 }, pos = { x = p.position[1], y = p.position[2], z = p.position[3] },
+    rot = { x = 0, y = 0, z = 0 }, buttons = {},
+  }
   function o.getBounds() return { size = { x = 2 * o.scale.x, y = 2 * o.scale.y, z = 2 * o.scale.z } } end
   function o.getScale() return o.scale end
   function o.setScale(s) o.scale = { x = s[1], y = s[2], z = s[3] } end
+  function o.getPosition() return o.pos end
+  function o.getRotation() return o.rot end
+  function o.setRotation(r) o.rot = { x = r[1], y = r[2], z = r[3] } end
+  function o.positionToLocal(w) return { x = (w.x - o.pos.x) / o.scale.x, y = (w.y - o.pos.y) / o.scale.y, z = (w.z - o.pos.z) / o.scale.z } end
   function o.setColorTint() end
   function o.setName(n) o.name = n end
   function o.setLock() end
+  function o.setVectorLines(l) o.lines = l end
+  function o.clearButtons() o.buttons = {} end
+  function o.createButton(b)
+    assert(type(_G[b.click_function]) == "function", "missing click function " .. b.click_function)
+    o.buttons[#o.buttons + 1] = b
+  end
   function o.getGUID() return guid end
-  spawned[guid] = o
-  spawned[#spawned + 1] = o
+  function o.destruct()
+    objects[guid] = nil
+    onObjectDestroy(o)
+  end
+  objects[guid] = o
   p.callback_function(o)
   return o
 end
 
-local host = { color = "White", host = true }
-local red = { color = "Red", host = false }
-local blue = { color = "Blue", host = false }
+local function ship_objects()
+  local list = {}
+  for guid, s in pairs(State.ships) do list[#list + 1] = { obj = objects[guid], ship = s } end
+  return list
+end
 
 dofile(root .. "/build/Global.lua")
 onLoad("")
+assert(xml and xml:find("sbPickFaction"), "add-ship dropdowns missing")
 assert(ui_attrs["sbBtnSetup.interactable"] == "true", "setup button should be enabled")
-assert(lines and #lines >= 2, "border and wind ring should be drawn")
-assert(#spawned == 2 and State.objects.sea and State.objects.surround, "sea and surround should spawn")
-local sea = getObjectFromGUID(State.objects.sea)
-assert(sea.getBounds().size.x == 48 and sea.name == "Sea", "sea should be scaled to 48 wide")
+assert(State.objects.sea and State.objects.surround, "sea and surround should spawn")
 
-uiSetupWind(red) -- refused, not host
-assert(State.turn.phase == "setup")
+-- Add ships: Red adds Atrytian ships, Blue switches to Pirates.
+uiAddShip(red)
+uiPickRate(red, "1st Rate (65 pts)")
+uiAddShip(red)
+uiPickSide(blue, "Blue")
+uiPickFaction(blue, "Pirate Nations")
+assert(xml:find("Boarders %(2 pts%) G12 B16"), "crew options should follow the faction")
+uiPickCrew(blue, "Gunners (2 pts) G13 B14 R12 O12")
+uiAddShip(red) -- refused: Red can't add Blue ships
+uiAddShip(blue)
+local count = 0
+for _ in pairs(State.ships) do count = count + 1 end
+assert(count == 3, "expected 3 ships, got " .. count)
+for _, e in ipairs(ship_objects()) do
+  assert(#e.obj.buttons == 2, e.ship.name .. " should have a label and Done button")
+  -- 6 attitude rays (30, 90, 150 off the bow, both sides) + 2 arrow lines.
+  assert(#e.obj.lines == 8, e.ship.name .. " has " .. #e.obj.lines .. " lines")
+  for _, l in ipairs(e.obj.lines) do
+    for _, p in ipairs(l.points) do
+      -- Stays on the base: local coords within half size (ship at rotation 0 or 180, scale = size).
+      assert(math.abs(p[1] * e.obj.scale.x) <= e.ship.base.width / 2 + 1e-6, "line leaves the base sideways")
+      assert(math.abs(p[3] * e.obj.scale.z) <= e.ship.base.length / 2 + 1e-6, "line leaves the base lengthways")
+    end
+  end
+end
+
+-- Game controls stay hidden until Start Game.
+assert(ui_attrs["sbGameSection.active"] == "false" and ui_attrs["sbSetupSection.active"] == "true")
+assert(ui_values.sbTitle == "Sail & Broadside")
 uiSetupWind(host)
-assert(State.turn.phase == "initiative" and State.wind)
+assert(State.turn.phase == "setup", "wind can't be rolled before Start Game")
+uiStartGame(red)
+assert(not State.started, "only the host starts the game")
+uiStartGame(host)
+assert(ui_attrs["sbGameSection.active"] == "true" and ui_attrs["sbSetupSection.active"] == "false")
+uiAddShip(host)
+assert(count == 3 and spawn_count == 5, "no ships can be added after Start Game")
+assert(ui_values.sbFleetText:find("Blue 1st Rate 1"), "fleet panel should list ships")
+assert(ui_values.sbFleetText:find("Crew 9/9  Hull 6/6"), "pirate 1st rate has 6 hull")
 
+uiSetupWind(host)
 local guard = 0
 while State.turn.phase ~= "over" do
   guard = guard + 1
@@ -69,21 +127,36 @@ while State.turn.phase ~= "over" do
   if phase == "initiative" then
     uiRollInitiative(host)
   elseif phase == "activation" then
-    local seat = State.turn.current == "red" and red or blue
-    uiEndActivation(seat == red and blue or red) -- wrong seat is refused
-    uiEndActivation(seat)
+    local side = State.turn.current
+    local id = State.turn.ships[side][1]
+    for _, sid in ipairs(State.turn.ships[side]) do
+      if not State.turn.activated[sid] then id = sid break end
+    end
+    sbShipDone(objects[id], side == "red" and "Blue" or "Red") -- wrong seat is refused
+    assert(not State.turn.activated[id], "wrong seat should not activate")
+    sbShipDone(objects[id], side == "red" and "Red" or "Blue")
+    assert(State.turn.activated[id], "ship should be activated")
+    assert(objects[id].buttons[2].label == "Activated")
   elseif phase == "wind" then
     uiWindPhase(host)
+  end
+  -- Delete a Red ship mid-game, as if a player removed it.
+  if State.turn.turn == 3 and count == 3 then
+    for _, e in ipairs(ship_objects()) do
+      if e.ship.side == "red" then e.obj.destruct() break end
+    end
+    count = 2
   end
 end
 assert(State.turn.turn == 6, "expected 6 turns, got " .. State.turn.turn)
 
--- Save and reload mid-state.
 local saved = onSave()
 State = nil
 onLoad(saved)
 assert(State.turn.phase == "over")
-assert(#spawned == 2, "reload should reuse the existing sea, not spawn another")
+assert(spawn_count == 5, "reload should reuse existing objects")
+
+uiNewGame(host)
+assert(next(State.ships) == nil, "new game should clear ships")
 
 print(("smoke ok: %d broadcasts, last: %s"):format(#messages, messages[#messages]))
-print("panel: " .. tostring(ui_values.sbTurn) .. " | " .. tostring(ui_values.sbWind))

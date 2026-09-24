@@ -92,6 +92,22 @@ function M.activate(state, side, ship_id)
   return true
 end
 
+-- Takes a ship out of the turn (deleted, sunk, abandoned). If that leaves
+-- the side to move with nothing to activate, play passes on.
+function M.remove_ship(state, ship_id)
+  for _, side in ipairs(state.sides) do
+    local list = state.ships[side]
+    for i = #list, 1, -1 do
+      if list[i] == ship_id then table.remove(list, i) end
+    end
+  end
+  state.activated[ship_id] = nil
+  if state.phase == M.ACTIVATION and #M.remaining(state, state.current) == 0 then
+    state.current = M.next_side(state, state.current)
+    if not state.current then state.phase = M.WIND end
+  end
+end
+
 -- Called once the Wind Phase (drift + wind roll) has been resolved.
 function M.end_wind_phase(state)
   if state.phase ~= M.WIND then return false, "not the wind phase" end
