@@ -49,7 +49,8 @@ function spawnObject(p)
   function o.positionToLocal(w) return { x = (w.x - o.pos.x) / o.scale.x, y = (w.y - o.pos.y) / o.scale.y, z = (w.z - o.pos.z) / o.scale.z } end
   function o.setColorTint() end
   function o.setName(n) o.name = n end
-  function o.setLock() end
+  function o.setLock(v) o.locked = v end
+  function o.setPosition(p) o.pos = { x = p[1], y = p[2], z = p[3] } end
   function o.setVectorLines(l) o.lines = l end
   function o.clearButtons() o.buttons = {} end
   function o.createButton(b)
@@ -119,6 +120,8 @@ assert(ui_values.sbFleetText:find("Blue 1st Rate 1"), "fleet panel should list s
 assert(ui_values.sbFleetText:find("Crew 9/9  Hull 6/6"), "pirate 1st rate has 6 hull")
 
 uiSetupWind(host)
+for _, e in ipairs(ship_objects()) do assert(e.obj.locked, "Start Game locks ships") end
+local scrapes = 0
 local guard = 0
 while State.turn.phase ~= "over" do
   guard = guard + 1
@@ -128,15 +131,54 @@ while State.turn.phase ~= "over" do
     uiRollInitiative(host)
   elseif phase == "activation" then
     local side = State.turn.current
+    local seat = side == "red" and "Red" or "Blue"
+    local wrong = side == "red" and "Blue" or "Red"
     local id = State.turn.ships[side][1]
     for _, sid in ipairs(State.turn.ships[side]) do
       if not State.turn.activated[sid] then id = sid break end
     end
-    sbShipDone(objects[id], side == "red" and "Blue" or "Red") -- wrong seat is refused
+    local obj = objects[id]
+    assert(obj.locked, "ships are locked outside their move")
+    assert(obj.buttons[2].label == "Move")
+
+    sbShipDone(obj, seat) -- refused: must move first
+    assert(not State.turn.activated[id], "can't end activation before moving")
+    sbShipMove(obj, wrong)
+    assert(not State.move, "wrong seat can't move the ship")
+    sbShipMove(obj, seat)
+    assert(State.move and not obj.locked and obj.buttons[2].label == "Moving")
+
+    -- Drag onto the nearest enemy ship (so the sides eventually scrape), preview, drop.
+    local aim, best
+    for _, e in ipairs(ship_objects()) do
+      if e.ship.side ~= side then
+        local d = (e.obj.pos.x - obj.pos.x) ^ 2 + (e.obj.pos.z - obj.pos.z) ^ 2
+        if not best or d < best then aim, best = e.obj, d end
+      end
+    end
+    obj.held_by_color = seat
+    obj.pos = { x = aim.pos.x, y = obj.pos.y, z = aim.pos.z }
+    for _ = 1, 4 do onUpdate() end
+    assert(State.move.plan, "dragging should preview a plan")
+    obj.held_by_color = nil
+    onObjectDrop(seat, obj)
+    uiNudgeRight(Player[wrong])
+    assert(State.move.offset == 0, "wrong seat can't nudge")
+    uiNudgeRight(Player[seat])
+    uiNudgeLeft(Player[seat])
+    local planned = State.move.plan
+    assert(planned.length <= State.move.allow.forward + 1e-9, "move within allowance")
+    assert(planned.length >= State.move.allow.min_forward - 1e-9 or planned.contact, "move at least the minimum")
+    uiMoveConfirm(Player[seat])
+    assert(not State.move and obj.locked and State.ships[id].moved)
+    assert(math.abs(obj.pos.x - planned.end_pose.x) < 1e-9, "ship placed at the end of its path")
+    if planned.contact then scrapes = scrapes + 1 end
+
+    sbShipDone(obj, wrong) -- wrong seat is refused
     assert(not State.turn.activated[id], "wrong seat should not activate")
-    sbShipDone(objects[id], side == "red" and "Red" or "Blue")
+    sbShipDone(obj, seat)
     assert(State.turn.activated[id], "ship should be activated")
-    assert(objects[id].buttons[2].label == "Activated")
+    assert(obj.buttons[2].label == "Activated")
   elseif phase == "wind" then
     uiWindPhase(host)
   end
@@ -149,6 +191,8 @@ while State.turn.phase ~= "over" do
   end
 end
 assert(State.turn.turn == 6, "expected 6 turns, got " .. State.turn.turn)
+assert(scrapes > 0, "ships sailing at each other should scrape")
+print("scrapes: " .. scrapes)
 
 local saved = onSave()
 State = nil

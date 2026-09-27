@@ -12,6 +12,8 @@ local FILES = {
   "tests.test_turn",
   "tests.test_data",
   "tests.test_ship",
+  "tests.test_geometry",
+  "tests.test_movement",
 }
 
 local filter = arg and arg[1]

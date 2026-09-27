@@ -62,11 +62,13 @@ local function wind_arrow(wind, tbl, spec)
   return lines
 end
 
-function M.render(config, wind)
+-- extra: more lines to draw this frame (move preview).
+function M.render(config, wind, extra)
   local lines = { border(config.table) }
   for _, l in ipairs(wind_arrow(wind, config.table, config.tts.wind_indicator)) do
     lines[#lines + 1] = l
   end
+  for _, l in ipairs(extra or {}) do lines[#lines + 1] = l end
   Global.setVectorLines(lines)
 end
 

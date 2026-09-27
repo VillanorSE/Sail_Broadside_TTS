@@ -15,6 +15,16 @@ local function button(id, label, handler)
   return string.format('<Button id="%s" onClick="%s" preferredHeight="30" fontSize="14">%s</Button>', id, handler, esc(label))
 end
 
+-- A row of buttons: { {id, label, handler}... }
+local function row(buttons)
+  local parts = { '<HorizontalLayout preferredHeight="30" spacing="4">' }
+  for _, b in ipairs(buttons) do
+    parts[#parts + 1] = string.format('<Button id="%s" onClick="%s" fontSize="13">%s</Button>', b[1], b[3], esc(b[2]))
+  end
+  parts[#parts + 1] = '</HorizontalLayout>'
+  return table.concat(parts)
+end
+
 -- dd: { id, label, handler, options = { {value, label}... }, selected = value }
 local function dropdown(dd)
   local opts = {}
@@ -43,6 +53,14 @@ function M.build(dropdowns)
     text("sbWind", 15),
     text("sbInit", 13),
     text("sbActive", 15, 'fontStyle="Bold"'),
+    -- Move controls: shown while a ship is moving.
+    '<VerticalLayout id="sbMoveSection" active="false" spacing="4" childForceExpandHeight="false">',
+    '<Text id="sbMoveInfo" fontSize="13" color="#FFFFFF" alignment="UpperLeft" preferredHeight="80"></Text>',
+    row({ { "sbMvForward", "Forward", "uiMoveForward" }, { "sbMvBack", "Backward", "uiMoveBackward" },
+      { "sbMvDrift", "Drift", "uiMoveDrift" } }),
+    row({ { "sbMvLeft", "< Turn", "uiNudgeLeft" }, { "sbMvRight", "Turn >", "uiNudgeRight" } }),
+    row({ { "sbMvConfirm", "Confirm Move", "uiMoveConfirm" }, { "sbMvCancel", "Cancel", "uiMoveCancel" } }),
+    '</VerticalLayout>',
     -- Setup: add ships, then Start Game. Hidden once the game starts.
     '<VerticalLayout id="sbSetupSection" spacing="4" childForceExpandHeight="false">',
     '<Text fontSize="15" fontStyle="Bold" color="#F0D9A0" alignment="MiddleLeft" preferredHeight="26">Add Ship</Text>',
@@ -75,6 +93,8 @@ function M.update(view)
     UI.setValue("sbTitle", "Sail & Broadside")
     UI.setAttribute("sbSetupSection", "active", view.started and "false" or "true")
     UI.setAttribute("sbGameSection", "active", view.started and "true" or "false")
+    UI.setAttribute("sbMoveSection", "active", view.move_info and "true" or "false")
+    UI.setValue("sbMoveInfo", view.move_info or "")
     UI.setValue("sbTurn", view.turn)
     UI.setValue("sbWind", view.wind)
     UI.setValue("sbInit", view.initiative)

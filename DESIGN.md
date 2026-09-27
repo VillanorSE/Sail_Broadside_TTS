@@ -238,6 +238,7 @@ Game lasts **6 turns**, or ends the turn a player is **routed** (at the start of
 | Critical hits | One guaranteed damage plus a durability roll for a second. |
 | Dice | Script-rolled; defender clicks to roll durability. |
 | Ship bases | Flat generated tiles, no models yet. |
+| Movement allowance order | 1. base sail minus 1" per Taking on Water; 2. minus ball & chain losses; 3. halved for damaged rigging; 4. times wind attitude; 5. halved (once) for crew under 50% or entangled. Backward: steps 1-3, then 1/4, then step 5; never wind-modified. |
 | Wind D6 numbering | Seen from behind Deployment Zone A: 1 = near-left corner, then clockwise (1 SW, 2 W, 3 NW, 4 NE, 5 E, 6 SE). |
 | Mild wind shift | Moves the wind one D6 point, clockwise or counterclockwise (D20: 1-10 CCW, 11-20 CW). |
 | No wind (becalmed) | Every ship moves at base sail (1x), regardless of heading. |

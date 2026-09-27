@@ -54,7 +54,7 @@ end
 local WHITE = { 1, 1, 1 }
 
 -- (Re)draws the markings, label and button. Safe to call on every refresh.
--- opts: { activated, label_scale, done_scale, attitude = config.wind.attitude }
+-- opts: { button = M.BUTTONS entry, label_scale, done_scale, attitude = config.wind.attitude }
 function M.decorate(obj, ship, opts)
   local s = obj.getScale()
   local top = M.THICKNESS / 2 + 0.02
@@ -100,17 +100,26 @@ function M.decorate(obj, ship, opts)
     font_color = WHITE,
     scale = { k / s.x, 1, k / s.z },
   })
+  local b = opts.button
   obj.createButton({
-    click_function = "sbShipDone", function_owner = Global,
-    label = opts.activated and "Activated" or "Done",
-    tooltip = opts.activated and "Already activated this turn" or "End this ship's activation",
+    click_function = b.click, function_owner = Global,
+    label = b.label,
+    tooltip = b.tooltip,
     position = local_point(obj, 0, top, -L * 0.34),
     rotation = { 0, 180, 0 },
     width = 420, height = 150, font_size = 80,
-    color = opts.activated and { 0.35, 0.35, 0.35 } or { 0.95, 0.85, 0.6 },
+    color = b.color,
     font_color = { 0, 0, 0 },
     scale = { d / s.x, 1, d / s.z },
   })
 end
+
+-- Button states for the ship base.
+M.BUTTONS = {
+  move = { label = "Move", click = "sbShipMove", color = { 0.6, 0.85, 1 }, tooltip = "Start this ship's move" },
+  moving = { label = "Moving", click = "sbNoop", color = { 0.45, 0.75, 0.45 }, tooltip = "Drag the ship; confirm in the panel" },
+  done = { label = "Done", click = "sbShipDone", color = { 0.95, 0.85, 0.6 }, tooltip = "End this ship's activation" },
+  activated = { label = "Activated", click = "sbNoop", color = { 0.35, 0.35, 0.35 }, tooltip = "Already activated this turn" },
+}
 
 return M
