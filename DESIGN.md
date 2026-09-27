@@ -1,6 +1,8 @@
 # Sail & Broadside: Tabletop Simulator Mod Design
 
-Target ruleset: **Sail & Broadside v0.8.2.4** (the rules docx in this repo is the source of truth; where this doc and the rules disagree, fix whichever is wrong and note it in "Rules Decisions" below).
+Target ruleset: **Sail & Broadside v0.8.2.4** (the rules docx in this repo is the source of truth). The owner's rulings live in [docs/DECISIONS.md](docs/DECISIONS.md) and override the docx where they conflict.
+
+This project implements the existing game in TTS. It does not redesign or rebalance the rules; ambiguities go to the owner as questions and the answers are recorded in DECISIONS.md.
 
 Implementation language: **Lua** (Tabletop Simulator scripting), with rules logic kept in pure Lua so it can be unit tested outside TTS.
 
@@ -11,11 +13,11 @@ Implementation language: **Lua** (Tabletop Simulator scripting), with rules logi
 - Script a playable digital version of Sail & Broadside for Tabletop Simulator.
 - Automate the tedious parts: wind, turn tracking, shooting modifiers and dice, durability, damage, effects, repairs, boarding, scoring.
 - Keep movement physical and natural: players drag their ships, but only to places the ship can legally reach.
-- **Flat bases only for now.** No ship models or tokens exist yet. Ships are generated as flat tiles at the base sizes below; models can be swapped in later.
+- **Flat bases for now.** Ships are generated as flat tiles at the base sizes below. Ship tokens, terrain art and markers are being added through the asset workflow in [docs/ASSETS.md](docs/ASSETS.md).
 - **Script-rolled dice** (no physical dice), so results are fast, consistent, and visible to everyone.
 
 ### Non-goals (for now)
-- Custom art, sound, or ship models.
+- Sound and 3D ship models.
 - AI opponents.
 - Arbitrary freeform terrain. Shallows and rough water need known footprints, so terrain will be a curated set of island and zone objects.
 
@@ -84,12 +86,12 @@ Attitude is fixed at the **start of the turn** and applies for the whole move. M
 **Turning:** ships have a minimum turn arc of 3", 4" or 5" (a quarter circle, i.e. a 90-degree turn). Minimum turn radius = `2L / pi` (about 1.91", 2.55", 3.18"). Wider turns are always allowed. Legal reachable poses are computed from the shortest curved path (Dubins-style) and checked against the allowance.
 
 **Other movement rules to script:**
-- Minimum move of 2" (or full movement if the modified value is under 2"). If a ship elects not to move, it drifts 2" with the wind.
-- Backward move: straight only, flat 1/4 of base movement, never wind-modified, cannot combine with forward movement.
+- Minimum move of 2" (or full movement if the modified value is under 2"). If a ship elects not to move, it drifts 1.5" with the wind (D-017); becalmed, it does not move (D-015).
+- Backward move: may turn with the normal arc (D-016); 1/4 of base movement after allowance steps 1-3, then halved per step 5; never wind-modified; cannot combine with forward movement.
 - Crew under 50%: the ship either moves or acts, not both (see 3.6).
-- Land contact: the ship stops immediately before land; a later full-movement activation can turn it up to 90 degrees to sit tangential to the land.
+- Land contact (D-020): the base may sweep over land, but the leading edge (rear edge when backward) may not touch it and no part of the base may overlap it at the end of the move; the ship stops immediately before either happens. A later full-movement activation can turn it up to 90 degrees to sit tangential to the land.
 - **Scraping:** ship-to-ship contact stops the mover. On each involved ship's next activation, a repair roll (free, not counting as the activation) decides entanglement; failure means half speed.
-- **Shallows and rough water** are checked **along the actual legal path**, but **resolved at Confirm Move**, not during the preview. This stops players dragging in and out of a zone to re-roll. If a check results in Slowed or Stuck, the ship ends short of where the preview showed. Rough water and shallows each have their own tables by ship class in the rules.
+- **Shallows and rough water** are checked **along the actual legal path**, but **resolved at Confirm Move**, not during the preview. This stops players dragging in and out of a zone to re-roll. A ship that starts its activation in rough water or shallows checks first; Stuck means it does not move that activation (D-021). If a check results in Slowed or Stuck, the ship ends short of where the preview showed. Rough water and shallows each have their own tables by ship class in the rules.
 
 An optional **waypoint mode** can be added later for contested paths.
 
@@ -145,7 +147,7 @@ Size classes: 1st/2nd = large, 3rd/4th = medium, 5th/frigate = small.
 
 **Line of fire:** extend a line along the centerline of the shooter's base; if it intersects any part of the target's base, the target can be shot. **Range** is measured from the center of the nearest long side of the shooter's base to the nearest point of the target base. **Head on / tail on:** the shooter's centerline line intersects the target's front or rear narrow side. In that case, which side of the target takes the hit depends on which side of the target's centerline the shooter's line is more on.
 
-**Obstruction:** less than half of the target's base visible from the shooter's centerline-nearest point. Implemented by sampling points across the target base and raycasting against terrain and ships; this is approximate. See Open Items for the pending ruling on obstruction versus head/tail-on.
+**Obstruction:** less than half of the target's base visible from the shooter's centerline-nearest point. Implemented by sampling points across the target base and raycasting against terrain and ships; this is approximate. The ruling on obstruction versus head/tail-on is open (O-001 in DECISIONS.md).
 
 ### 3.5 Durability and damage
 
@@ -173,7 +175,7 @@ Size classes: 1st/2nd = large, 3rd/4th = medium, 5th/frigate = small.
 3. When that side's armor is gone, remaining damage **carries over to hull**.
 4. Each **hull damage** point rolls once on the Damage Effect table.
 
-Every hit therefore lands on left or right armor first; there is no unarmored arc in this model (see Open Items for the rules text that still says the rear has no armor).
+Every hit therefore lands on left or right armor first; there is no unarmored arc in this model (D-002; the rulebook still says the rear has no armor, see RULEBOOK_ERRATA.md).
 
 **Critical hits:** a crit causes one immediate point of damage and also gets a durability roll. If the roll fails, the crit does a total of two damage; if it succeeds, one. Overflow rules apply as normal, so a crit can take a side's last armor point and then a hull point. Captain bonuses change this: Firepower (rare) makes crits automatically two damage with no save; Sturdy Ships (common) allows a durability roll against the normally automatic damage.
 
@@ -223,46 +225,17 @@ Game lasts **6 turns**, or ends the turn a player is **routed** (at the start of
 
 ---
 
-## 4. Rules Decisions (recorded from design discussion)
+## 4. Rules Decisions
 
-| Topic | Decision |
-| --- | --- |
-| Durability check | D20 + durability modifier must be **equal to or greater than** shot damage to negate a hit. |
-| Durability vs. shot | Target number is the shot's damage (8/10/12/14, carronade +4, extreme -2). |
-| Armor / hull split | Damage hits the struck side's armor first; overflow carries to hull. |
-| Head-on / tail-on hit location | Hits apply to the armor of whichever side of the target's centerline the shooter's centerline is on. |
-| Head-on / tail-on to hit | **-2 to hit** for both. |
-| **Tail-on durability** | **-3 modifier on the durability roll**, in addition to the -2 to hit. |
-| **Defeated ship drift** | **1.5" per turn** in the Wind Phase. |
-| Non-moving active ship drift | 2" (separate rule; ship must move at least 2"). |
-| Critical hits | One guaranteed damage plus a durability roll for a second. |
-| Dice | Script-rolled; defender clicks to roll durability. |
-| Ship bases | Flat generated tiles, no models yet. |
-| Movement allowance order | 1. base sail minus 1" per Taking on Water; 2. minus ball & chain losses; 3. halved for damaged rigging; 4. times wind attitude; 5. halved (once) for crew under 50% or entangled. Backward: steps 1-3, then 1/4, then step 5; never wind-modified. |
-| Wind D6 numbering | Seen from behind Deployment Zone A: 1 = near-left corner, then clockwise (1 SW, 2 W, 3 NW, 4 NE, 5 E, 6 SE). |
-| Mild wind shift | Moves the wind one D6 point, clockwise or counterclockwise (D20: 1-10 CCW, 11-20 CW). |
-| No wind (becalmed) | Every ship moves at base sail (1x), regardless of heading. |
-| Initiative tie | Tie on total goes to more ships running; if that is also tied, re-roll. |
-| 5th Rate crew | 4 for every faction (Atrytian and Denrudain tables say 3; fix in docx). |
-| Denrudain 3rd Rate cargo | 5 (table says 4; Resilient Ships gives +1). |
+Moved to [docs/DECISIONS.md](docs/DECISIONS.md), one entry per ruling with an ID (D-001, D-002, ...), its source, affected code and tests, and status. Refer to rulings by ID in code comments and commit messages.
 
 ---
 
 ## 5. Open Items
 
-**Needs a ruling before the shooting stage:**
-1. **Obstruction versus head-on/tail-on.** From the playtest note: an obstructed shot (-3) can end up worse than a head-on/tail-on shot, which may be intended as a penalty for avoiding head/tail-on without getting a clear shot. Decide whether to keep it or change head/tail-on to -3 so the two are similar.
-
-**Rules text to update in the docx (mismatches with the decisions above):**
-- **Wind Phase / Drift:** text says wrecks move 2" with the wind; it should say defeated ships drift 1.5" (wrecks are removed).
-- **Health > Durability:** says the target number depends on shot type and range; it should describe the D20 + modifier roll against shot damage.
-- **Shooting table:** the "Tail On +3 mod." line is a leftover; reword it as the -3 tail-on durability modifier so the table and text agree.
-- **Tail-on** should be described as -2 to hit (same as head-on) plus a -3 durability modifier. The text under Shooting currently says only the -3 durability penalty.
-- **Armor section:** it says the rear of a ship has no armor, which conflicts with head-on/tail-on hits applying to a side's armor. Update it to match Section 3.5.
-- **Faction ship tables:** Atrytian and Denrudain 5th Rate crew should be 4; Denrudain 3rd Rate cargo should be 5.
-- **Wind Shift:** state that a mild shift moves one numbered point, and that no wind means 1x movement for all ships.
-- **Secret objective "From Behind"** ("inflict a hull damage through a shot to the rear arc") now needs that side's armor to be depleted first. Confirm that is intended.
-- Rules edge cases to clarify as they come up: moving backward and wind, and whether Versatility / Range Control bonuses should also affect the tail-on durability penalty (currently assumed **not**, since they only mention to-hit). Range Control (rare)'s "only -1" for head-on/tail-on to-hit is consistent with the -2 base.
+- Open rules questions: the "Open" section of [docs/DECISIONS.md](docs/DECISIONS.md).
+- Rulebook wording that disagrees with the rulings: [docs/RULEBOOK_ERRATA.md](docs/RULEBOOK_ERRATA.md).
+- Known bugs: [docs/BUGS.md](docs/BUGS.md).
 
 **Rules in flux (keep in `config.lua`):** head/tail-on modifiers, drift distances, durability comparison (equal or exceed), ghost lifetime, ability of critical hits to be saved.
 
