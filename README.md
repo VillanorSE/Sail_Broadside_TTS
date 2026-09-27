@@ -1,6 +1,6 @@
 # Sail & Broadside: Tabletop Simulator mod
 
-Scripted TTS version of Sail & Broadside v0.8.2.4. See [DESIGN.md](DESIGN.md) for the plan and rulings, and [docs/](docs/) for the rules.
+Scripted TTS version of Sail & Broadside v0.8.2.4. See [DESIGN.md](DESIGN.md) for the design, [docs/DECISIONS.md](docs/DECISIONS.md) for the owner's rulings, [docs/STATUS.md](docs/STATUS.md) for progress, and [docs/](docs/) for the rules. Agents start with [CLAUDE.md](CLAUDE.md).
 
 ## Layout
 
@@ -10,7 +10,8 @@ Scripted TTS version of Sail & Broadside v0.8.2.4. See [DESIGN.md](DESIGN.md) fo
 | `data/` | Faction ships, crews and bonuses |
 | `tts/` | TTS glue: UI, drawing, Global script entry (`tts/global.lua`) |
 | `tests/` | Unit tests for `rules/` |
-| `tools/` | Bundler and TTS smoke test |
+| `tools/` | Bundler (with a Lua 5.2 check), TTS smoke test, save generator |
+| `docs/` | Rules, decisions, errata, status, bugs, assets |
 | `config.lua` | Rules values that may still change |
 
 ## Commands (from the repo root)
@@ -27,7 +28,7 @@ lua tools/bundle.lua
 lua tools/tts_smoke.lua
 ```
 
-`tests/run.lua` takes an optional name filter, e.g. `lua tests/run.lua wind`. The bundler writes `build/Global.lua`, one file with every module inlined (TTS has no `require`). The smoke test runs that bundle through a full 6-turn game against a fake TTS API.
+`tests/run.lua` takes an optional name filter, e.g. `lua tests/run.lua wind`. The bundler writes `build/Global.lua`, one file with every module inlined (TTS has no `require`). The bundler refuses Lua 5.3+ features, since TTS runs Lua 5.2. The smoke test runs that bundle through a full 6-turn game against a fake TTS API, with real JSON saves; `SMOKE_SEED=n` replays it with other dice.
 
 ## Loading into Tabletop Simulator
 
