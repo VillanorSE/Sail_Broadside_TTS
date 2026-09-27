@@ -17,7 +17,7 @@ local M = {}
 
 local TAU = 2 * math.pi
 -- math.atan2 in Lua 5.1/5.2 (TTS MoonSharp); two-argument math.atan in 5.3+.
-local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end
+local atan2 = math.atan2 or function(y, x) return math.atan(y, x) end -- lua52: ok (5.3+ fallback)
 local EPS = 1e-9
 
 local function mod2pi(a)
