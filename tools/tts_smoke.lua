@@ -6,15 +6,9 @@ local root = script:match("^(.*)[/\\]tools[/\\][^/\\]*$") or "."
 
 local messages, ui_values, ui_attrs, lines, xml = {}, {}, {}, nil, nil
 
-local function deep_copy(v)
-  if type(v) ~= "table" then return v end
-  local t = {}
-  for k, x in pairs(v) do t[k] = deep_copy(x) end
-  return t
-end
-
 -- Stand-ins for the TTS globals the script uses.
-JSON = { encode = function(t) return deep_copy(t) end, decode = function(t) return deep_copy(t) end }
+-- Real text JSON, strict about what TTS would mangle (see tools/fake_json.lua).
+JSON = dofile(root .. "/tools/fake_json.lua")
 UI = {
   setXml = function(x) xml = x end,
   setValue = function(id, v) ui_values[id] = v end,
@@ -73,6 +67,11 @@ local function ship_objects()
   return list
 end
 
+-- Fixed dice so a failure can be reproduced: SMOKE_SEED=n picks another game.
+local seed = tonumber(os.getenv("SMOKE_SEED") or "") or 1
+math.randomseed(seed)
+math.randomseed = function() end -- the script's own os.time() seeding is ignored
+
 dofile(root .. "/build/Global.lua")
 onLoad("")
 assert(xml and xml:find("sbPickFaction"), "add-ship dropdowns missing")
@@ -122,6 +121,7 @@ assert(ui_values.sbFleetText:find("Crew 9/9  Hull 6/6"), "pirate 1st rate has 6 
 uiSetupWind(host)
 for _, e in ipairs(ship_objects()) do assert(e.obj.locked, "Start Game locks ships") end
 local scrapes = 0
+local reloaded_mid_move = false
 local guard = 0
 while State.turn.phase ~= "over" do
   guard = guard + 1
@@ -162,6 +162,15 @@ while State.turn.phase ~= "over" do
     assert(State.move.plan, "dragging should preview a plan")
     obj.held_by_color = nil
     onObjectDrop(seat, obj)
+    if State.turn.turn == 2 and not reloaded_mid_move then
+      -- Save and reload with a move in progress (TTS autosaves at any time).
+      reloaded_mid_move = true
+      local saved = onSave()
+      assert(type(saved) == "string", "onSave should return JSON text")
+      State = nil
+      onLoad(saved)
+      assert(State.move and State.move.plan and State.move.ship == id, "move in progress survives a reload")
+    end
     uiNudgeRight(Player[wrong])
     assert(State.move.offset == 0, "wrong seat can't nudge")
     uiNudgeRight(Player[seat])
@@ -192,7 +201,8 @@ while State.turn.phase ~= "over" do
 end
 assert(State.turn.turn == 6, "expected 6 turns, got " .. State.turn.turn)
 assert(scrapes > 0, "ships sailing at each other should scrape")
-print("scrapes: " .. scrapes)
+assert(reloaded_mid_move, "smoke should reload mid-move")
+print("seed " .. seed .. ", scrapes: " .. scrapes)
 
 local saved = onSave()
 State = nil
