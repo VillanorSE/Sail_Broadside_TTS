@@ -86,10 +86,10 @@ return {
 
   movement = {
     min_move = 2,
-    backward_fraction = 0.25, -- backward moves: 1/4 of base movement, no wind
+    backward_fraction = 0.25, -- backward moves: 1/4 of base movement, no wind (D-016)
     nudge_step = 5,           -- degrees per heading nudge click
     contact_step = 0.05,      -- inches between scrape checks along a path
-    idle_drift = 2,       -- active ship that elects not to move
+    idle_drift = 1.5,     -- active ship that elects not to move (D-017)
     defeated_drift = 1.5, -- defeated ships, Wind Phase
   },
 

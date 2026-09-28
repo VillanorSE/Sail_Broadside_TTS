@@ -18,7 +18,7 @@ Last updated: 2026-09-27.
 ## Milestones
 
 - **M0 Housekeeping.** Decision record, errata, bug log, asset workflow, CLAUDE.md, agent definitions, Lua 5.2 check in the bundler, real JSON round trip in the smoke test. *Done.*
-- **M1 Stage 3 close-out.** Backward moves may turn (D-016); idle drift 1.5" (D-017). *In progress.*
+- **M1 Stage 3 close-out.** Backward moves may turn (D-016); idle drift 1.5" (D-017). *Built; waiting on the owner's TTS check.*
 - **M2 Terrain.** `rules/terrain.lua` (island shapes, per-ship shallows, rough water, leading-edge path checks, Slowed/Stuck, land stop per D-020, start-of-activation checks per D-021); TTS terrain placement during setup; starter set per D-022. First asset family: terrain.
 - **M3 Stage 4 Shooting.** Needs O-001 answered first.
 - **M4 Stage 5.** Then Stage 6 scenarios, Stage 7 squadron builder.

@@ -91,18 +91,60 @@ return {
     T.eq(plan.contact, "enemy")
     T.near(plan.length, 4, 0.02)
   end },
-  { "backward: straight back, clamped", function()
+  { "backward: straight back, clamped (D-016)", function()
     local ctx = { radius = 2, allowance = 1.5, min = 1.5 }
-    local plan = mv.plan_backward(pose(0, 0, 90), { x = -5, z = 3 }, ctx)
+    local plan = mv.plan_backward(pose(0, 0, 90), { x = -5, z = 0 }, ctx)
     T.near(plan.end_pose.x, -1.5)
     T.near(plan.end_pose.z, 0)
-    T.eq(plan.end_pose.h, 90)
+    T.near(plan.end_pose.h, 90)
+    T.truthy(plan.backward)
   end },
-  { "drift: 2 inches with the wind, keeps heading", function()
-    local plan = mv.plan_drift(pose(0, 0, 45), { radius = 2, drift = 2, drift_dir = 180 })
-    T.near(plan.end_pose.z, -2)
+  { "backward: can turn, stern first, keeping the bow's facing sense (D-016)", function()
+    -- Facing north, backing toward the south-east: the stern swings east,
+    -- so the bow swings west (heading decreases), and the ship never faces backward.
+    local ctx = { radius = 1, allowance = 2, min = 0.5 }
+    local plan = mv.plan_backward(pose(0, 0, 0), { x = 1.2, z = -1.2 }, ctx)
+    T.truthy(plan.length <= 2 + 1e-9)
+    T.truthy(plan.end_pose.x > 0.3, "moved east")
+    T.truthy(plan.end_pose.z < -0.3, "moved south")
+    local h = plan.end_pose.h
+    T.truthy(h > 270 and h < 360, "bow turned west of north, got " .. h)
+  end },
+  { "backward: target ahead of the ship still backs up (D-016)", function()
+    local ctx = { radius = 2, allowance = 1.5, min = 1.5 }
+    local plan = mv.plan_backward(pose(0, 0, 0), { x = 0, z = 5 }, ctx)
+    T.truthy(plan.end_pose.z < 0, "never moves forward")
+  end },
+  { "backward: heading nudge turns the bow the same way as forward (D-016)", function()
+    local ctx = { radius = 1, allowance = 4, min = 1, heading_offset = 15 }
+    local plan = mv.plan_backward(pose(0, 0, 0), { x = 0, z = -2 }, ctx)
+    T.near(plan.end_pose.h, 15, 1e-6)
+    T.near(plan.end_pose.x, 0, 1e-6)
+    T.near(plan.end_pose.z, -2, 1e-6)
+  end },
+  { "backward: turning beyond the allowance is refused (D-016)", function()
+    local ctx = { radius = 2, allowance = 1.5, min = 1.5, heading_offset = 90 }
+    local plan, why = mv.plan_backward(pose(0, 0, 0), { x = 0, z = -1.5 }, ctx)
+    T.eq(plan, nil)
+    T.truthy(why:find("turn that far"))
+  end },
+  { "backward: stops at contact with a ship behind", function()
+    local other = { id = "behind", x = 0, z = -3, h = 90, w = 1, l = 3 }
+    local ctx = { radius = 2, allowance = 2, min = 2, w = 1, l = 3, others = { other }, step = 0.01 }
+    local plan = mv.plan_backward(pose(0, 0, 0), { x = 0, z = -5 }, ctx)
+    T.eq(plan.contact, "behind")
+    T.near(plan.length, 1, 0.02)
+    T.near(plan.end_pose.h, 0, 1e-6)
+  end },
+  { "drift: 1.5 inches with the wind, keeps heading (D-017)", function()
+    T.eq(config.movement.idle_drift, 1.5)
+    local ctx = { radius = 2, drift = config.movement.idle_drift, drift_dir = 180 }
+    local plan = mv.plan_drift(pose(0, 0, 45), ctx)
+    T.near(plan.end_pose.z, -1.5)
     T.near(plan.end_pose.h, 45)
-    T.eq(mv.plan_drift(pose(0, 0, 45), { radius = 2, drift = 2 }).length, 0)
+  end },
+  { "drift: becalmed ship does not move (D-015)", function()
+    T.eq(mv.plan_drift(pose(0, 0, 45), { radius = 2, drift = 1.5 }).length, 0)
   end },
   { "turn radius for real ships", function()
     local s = make("atrytian", "1st")

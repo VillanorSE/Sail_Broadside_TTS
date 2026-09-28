@@ -41,7 +41,7 @@ function M.replan(env, move, ship, fine)
   if move.mode == "drift" then
     plan = mv.plan_drift(move.start, ctx)
   elseif move.mode == "backward" then
-    plan = mv.plan_backward(move.start, move.target or move.start, ctx)
+    plan, why = mv.plan_backward(move.start, move.target or move.start, ctx)
   else
     local target = move.target
     if not target then
@@ -73,11 +73,13 @@ function M.overlay(env, move, ship)
   local w, l = ship.base.width, ship.base.length
 
   lines[#lines + 1] = rect(move.start, w, l, y, GREY)
-  if move.mode == "forward" then
+  if move.mode ~= "drift" then
+    -- Backward moves reach out behind the stern (D-016).
+    local from = move.mode == "backward" and mv.reversed(move.start) or move.start
     for _, spec in ipairs({ { ctx.allowance, YELLOW }, { ctx.min, ORANGE } }) do
       if spec[1] > 0 then
         local pts = {}
-        for i, p in ipairs(geo.reach_outline(move.start, ctx.radius, spec[1], 36)) do pts[i] = { p.x, y, p.z } end
+        for i, p in ipairs(geo.reach_outline(from, ctx.radius, spec[1], 36)) do pts[i] = { p.x, y, p.z } end
         lines[#lines + 1] = { points = pts, color = spec[2], thickness = 0.05 }
       end
     end

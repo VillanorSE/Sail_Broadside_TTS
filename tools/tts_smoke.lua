@@ -122,6 +122,7 @@ uiSetupWind(host)
 for _, e in ipairs(ship_objects()) do assert(e.obj.locked, "Start Game locks ships") end
 local scrapes = 0
 local reloaded_mid_move = false
+local backed, drifted = 0, 0
 local guard = 0
 while State.turn.phase ~= "over" do
   guard = guard + 1
@@ -148,40 +149,78 @@ while State.turn.phase ~= "over" do
     sbShipMove(obj, seat)
     assert(State.move and not obj.locked and obj.buttons[2].label == "Moving")
 
-    -- Drag onto the nearest enemy ship (so the sides eventually scrape), preview, drop.
-    local aim, best
-    for _, e in ipairs(ship_objects()) do
-      if e.ship.side ~= side then
-        local d = (e.obj.pos.x - obj.pos.x) ^ 2 + (e.obj.pos.z - obj.pos.z) ^ 2
-        if not best or d < best then aim, best = e.obj, d end
+    local turn_no = State.turn.turn
+    if turn_no == 4 then
+      -- Backward with a turn (D-016): drag behind and to one side, nudge, confirm.
+      uiMoveBackward(Player[seat])
+      local st = State.move.start
+      local r = math.rad(st.h)
+      obj.held_by_color = seat
+      obj.pos = { x = st.x - math.sin(r) * 1.2 + math.cos(r) * 1.2, y = obj.pos.y, z = st.z - math.cos(r) * 1.2 - math.sin(r) * 1.2 }
+      for _ = 1, 4 do onUpdate() end
+      obj.held_by_color = nil
+      onObjectDrop(seat, obj)
+      uiNudgeLeft(Player[seat])
+      local planned = State.move.plan
+      assert(planned.backward, "backward mode plans a backward move")
+      assert(planned.length <= State.move.allow.backward + 1e-9, "backward move within allowance")
+      local fx, fz = math.sin(r), math.cos(r)
+      local ahead = (planned.end_pose.x - st.x) * fx + (planned.end_pose.z - st.z) * fz
+      assert(ahead <= 1e-9, "backward move never ends ahead of the start")
+      uiMoveConfirm(Player[seat])
+      assert(not State.move and obj.locked and State.ships[id].moved)
+      assert(math.abs(obj.rot.y - planned.end_pose.h) < 1e-9, "ship placed at the backward move's heading")
+      if planned.contact then scrapes = scrapes + 1 end
+      backed = backed + 1
+    elseif turn_no == 5 then
+      -- Drift instead of moving (D-017, D-015).
+      uiMoveDrift(Player[seat])
+      uiNudgeRight(Player[seat]) -- refused: drifting ships can't turn
+      assert(State.move.offset == 0, "drift can't turn")
+      local planned = State.move.plan
+      local expect = State.wind.blowing and 1.5 or 0
+      assert(planned.contact or math.abs(planned.length - expect) < 1e-9,
+        "drift should be " .. expect .. ", got " .. planned.length)
+      uiMoveConfirm(Player[seat])
+      assert(not State.move and State.ships[id].moved)
+      if planned.contact then scrapes = scrapes + 1 end
+      drifted = drifted + 1
+    else
+      -- Drag onto the nearest enemy ship (so the sides eventually scrape), preview, drop.
+      local aim, best
+      for _, e in ipairs(ship_objects()) do
+        if e.ship.side ~= side then
+          local d = (e.obj.pos.x - obj.pos.x) ^ 2 + (e.obj.pos.z - obj.pos.z) ^ 2
+          if not best or d < best then aim, best = e.obj, d end
+        end
       end
+      obj.held_by_color = seat
+      obj.pos = { x = aim.pos.x, y = obj.pos.y, z = aim.pos.z }
+      for _ = 1, 4 do onUpdate() end
+      assert(State.move.plan, "dragging should preview a plan")
+      obj.held_by_color = nil
+      onObjectDrop(seat, obj)
+      if State.turn.turn == 2 and not reloaded_mid_move then
+        -- Save and reload with a move in progress (TTS autosaves at any time).
+        reloaded_mid_move = true
+        local saved = onSave()
+        assert(type(saved) == "string", "onSave should return JSON text")
+        State = nil
+        onLoad(saved)
+        assert(State.move and State.move.plan and State.move.ship == id, "move in progress survives a reload")
+      end
+      uiNudgeRight(Player[wrong])
+      assert(State.move.offset == 0, "wrong seat can't nudge")
+      uiNudgeRight(Player[seat])
+      uiNudgeLeft(Player[seat])
+      local planned = State.move.plan
+      assert(planned.length <= State.move.allow.forward + 1e-9, "move within allowance")
+      assert(planned.length >= State.move.allow.min_forward - 1e-9 or planned.contact, "move at least the minimum")
+      uiMoveConfirm(Player[seat])
+      assert(not State.move and obj.locked and State.ships[id].moved)
+      assert(math.abs(obj.pos.x - planned.end_pose.x) < 1e-9, "ship placed at the end of its path")
+      if planned.contact then scrapes = scrapes + 1 end
     end
-    obj.held_by_color = seat
-    obj.pos = { x = aim.pos.x, y = obj.pos.y, z = aim.pos.z }
-    for _ = 1, 4 do onUpdate() end
-    assert(State.move.plan, "dragging should preview a plan")
-    obj.held_by_color = nil
-    onObjectDrop(seat, obj)
-    if State.turn.turn == 2 and not reloaded_mid_move then
-      -- Save and reload with a move in progress (TTS autosaves at any time).
-      reloaded_mid_move = true
-      local saved = onSave()
-      assert(type(saved) == "string", "onSave should return JSON text")
-      State = nil
-      onLoad(saved)
-      assert(State.move and State.move.plan and State.move.ship == id, "move in progress survives a reload")
-    end
-    uiNudgeRight(Player[wrong])
-    assert(State.move.offset == 0, "wrong seat can't nudge")
-    uiNudgeRight(Player[seat])
-    uiNudgeLeft(Player[seat])
-    local planned = State.move.plan
-    assert(planned.length <= State.move.allow.forward + 1e-9, "move within allowance")
-    assert(planned.length >= State.move.allow.min_forward - 1e-9 or planned.contact, "move at least the minimum")
-    uiMoveConfirm(Player[seat])
-    assert(not State.move and obj.locked and State.ships[id].moved)
-    assert(math.abs(obj.pos.x - planned.end_pose.x) < 1e-9, "ship placed at the end of its path")
-    if planned.contact then scrapes = scrapes + 1 end
 
     sbShipDone(obj, wrong) -- wrong seat is refused
     assert(not State.turn.activated[id], "wrong seat should not activate")
@@ -202,7 +241,8 @@ end
 assert(State.turn.turn == 6, "expected 6 turns, got " .. State.turn.turn)
 assert(scrapes > 0, "ships sailing at each other should scrape")
 assert(reloaded_mid_move, "smoke should reload mid-move")
-print("seed " .. seed .. ", scrapes: " .. scrapes)
+assert(backed > 0 and drifted > 0, "smoke should back up and drift")
+print(("seed %d, scrapes: %d, backward moves: %d, drifts: %d"):format(seed, scrapes, backed, drifted))
 
 local saved = onSave()
 State = nil

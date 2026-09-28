@@ -509,7 +509,7 @@ end
 local function set_mode(player, mode)
   local m, s, obj = moving_ship(player)
   if not m then return end
-  m.mode, m.offset = mode, 0
+  m.mode, m.offset, m.target = mode, 0, nil -- a forward drag point means nothing backing up
   replan_and_place(m, s, obj)
   refresh()
 end
@@ -521,8 +521,8 @@ function uiMoveDrift(player) set_mode(player, "drift") end
 local function nudge(player, dir)
   local m, s, obj = moving_ship(player)
   if not m then return end
-  if m.mode ~= "forward" then
-    return broadcastToColor("Only forward moves can turn.", player.color, ERROR_COLOR)
+  if m.mode == "drift" then
+    return broadcastToColor("A drifting ship can't turn.", player.color, ERROR_COLOR)
   end
   local before = m.offset
   m.offset = before + dir * config.movement.nudge_step

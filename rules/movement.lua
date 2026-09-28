@@ -1,4 +1,5 @@
 -- Movement: allowance and planning a legal move.
+local angle = require("rules.angle")
 local geo = require("rules.geometry")
 
 local M = {}
@@ -78,13 +79,23 @@ function M.plan_forward(start, target, ctx)
   return finish(path, ctx)
 end
 
--- Straight backward move, no turning, toward the target's distance behind.
+-- A pose facing the other way. A backward move is planned as a forward move
+-- of the reversed pose: the stern leads and turns with the same arc. The base
+-- is symmetric, so contact checks along the path are unaffected.
+function M.reversed(p)
+  return { x = p.x, z = p.z, h = angle.norm(p.h + 180) }
+end
+
+-- Backward move toward a target point (D-016): may turn, stern first, within
+-- the backward allowance. Same ctx and result as plan_forward, plus
+-- plan.backward = true. The path's poses face the direction of travel (the
+-- stern); plan.end_pose is the ship's real pose.
 function M.plan_backward(start, target, ctx)
-  local r = math.rad(start.h)
-  local back = -((target.x - start.x) * math.sin(r) + (target.z - start.z) * math.cos(r))
-  local d = math.max(ctx.min, math.min(ctx.allowance, back))
-  local path = geo.make_path(start, { { kind = "T", len = d, dir = (start.h + 180) % 360 } }, ctx.radius)
-  return finish(path, ctx)
+  local plan, why = M.plan_forward(M.reversed(start), target, ctx)
+  if not plan then return nil, why end
+  plan.end_pose = M.reversed(plan.end_pose)
+  plan.backward = true
+  return plan
 end
 
 -- Drift with the wind instead of moving (no turning). No wind, no drift.

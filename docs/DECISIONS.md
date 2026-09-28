@@ -34,8 +34,8 @@ project; this project only implements.
 | D-013 | 5th Rate crew | Implemented |
 | D-014 | Denrudain 3rd Rate cargo | Implemented |
 | D-015 | Becalmed drift | Implemented |
-| D-016 | Backward moves may turn | Decided |
-| D-017 | Idle drift distance | Decided |
+| D-016 | Backward moves may turn | Implemented |
+| D-017 | Idle drift distance | Implemented |
 | D-018 | Terrain model | Decided |
 | D-019 | Terrain checked along the path, resolved at Confirm | Decided |
 | D-020 | Land contact during a move | Decided |
@@ -175,16 +175,16 @@ project; this project only implements.
 - **Source:** Rulebook, Movement
 - **Owner ruling:** Backward moves may turn, using the ship's normal turning arc. Allowance: steps 1-3 of D-012, times 1/4, then step 5. Never wind-modified. A ship moves forward or backward in one activation, not both.
 - **Affected implementation:** `rules/movement.lua` `plan_backward`; `tts/global.lua` nudges in backward mode
-- **Affected tests:** `tests/test_movement.lua`; smoke test backward move
-- **Status:** Decided
+- **Affected tests:** `tests/test_movement.lua` ("backward:" cases); smoke test turn 4
+- **Status:** Implemented
 
 ## D-017 Idle drift distance
 - **Date:** 2026-09-27
 - **Source:** Rulebook, Movement says 2"
 - **Owner ruling:** An active ship that elects not to move drifts 1.5" with the wind (same as defeated ships).
 - **Affected implementation:** `config.movement.idle_drift`
-- **Affected tests:** `tests/test_config.lua`, `tests/test_movement.lua`
-- **Status:** Decided
+- **Affected tests:** `tests/test_movement.lua` ("drift: 1.5 inches"); smoke test turn 5
+- **Status:** Implemented
 
 ## D-018 Terrain model
 - **Date:** 2026-09-27
