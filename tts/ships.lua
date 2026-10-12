@@ -35,6 +35,7 @@ function M.spawn(ship, pos, heading, color, surface_y, on_ready)
       obj.setRotation({ 0, heading, 0 })
       obj.setColorTint(color)
       obj.setName(ship.name)
+      obj.tooltip = false -- the hover pop-up covered the Move button (B-002)
       on_ready(obj)
     end,
   })
@@ -57,6 +58,7 @@ local WHITE = { 1, 1, 1 }
 -- opts: { button = M.BUTTONS entry, label_scale, done_scale, attitude = config.wind.attitude }
 function M.decorate(obj, ship, opts)
   local s = obj.getScale()
+  obj.tooltip = false -- B-002, also for ships from older saves
   local top = M.THICKNESS / 2 + 0.02
   local L, W = ship.base.length, ship.base.width
   local lines = {}

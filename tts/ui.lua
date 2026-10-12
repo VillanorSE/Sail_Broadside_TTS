@@ -41,9 +41,16 @@ local function dropdown(dd)
 end
 
 -- dropdowns: list of dropdown specs for the Add Ship section.
-function M.build(dropdowns)
+-- slots: number of ship buttons (handlers uiShipSlot1..n in tts/global.lua).
+function M.build(dropdowns, slots)
   local picks = {}
   for i, dd in ipairs(dropdowns) do picks[i] = dropdown(dd) end
+  -- Move / Done buttons for the side to activate, so players needn't click the
+  -- small button on the base (hover zoom can cover it). Labels set in update.
+  local ship_buttons = {}
+  for i = 1, slots do
+    ship_buttons[i] = string.format('<Button id="sbShip%d" onClick="uiShipSlot%d" preferredHeight="28" fontSize="13" active="false"></Button>', i, i)
+  end
   UI.setXml(table.concat({
     '<Panel id="sbPanel" width="320" height="700" rectAlignment="UpperRight" offsetXY="-10 -80" color="#14222FEE" padding="10 10 10 10">',
     '<VerticalLayout spacing="4" childForceExpandHeight="false">',
@@ -70,6 +77,7 @@ function M.build(dropdowns)
     '</VerticalLayout>',
     -- Game flow: shown once the game starts.
     '<VerticalLayout id="sbGameSection" active="false" spacing="4" childForceExpandHeight="false">',
+    table.concat(ship_buttons),
     button("sbBtnSetup", "Roll Wind", "uiSetupWind"),
     button("sbBtnInit", "Roll Initiative", "uiRollInitiative"),
     button("sbBtnWind", "Run Wind Phase", "uiWindPhase"),
@@ -101,6 +109,10 @@ function M.update(view)
     UI.setValue("sbActive", view.active)
     UI.setValue("sbLog", view.log)
     UI.setValue("sbFleetText", view.fleet)
+    for i, label in ipairs(view.ship_slots) do
+      UI.setAttribute("sbShip" .. i, "active", label ~= "" and "true" or "false")
+      UI.setValue("sbShip" .. i, label)
+    end
     for id, enabled in pairs(view.buttons) do
       UI.setAttribute(id, "interactable", enabled and "true" or "false")
     end

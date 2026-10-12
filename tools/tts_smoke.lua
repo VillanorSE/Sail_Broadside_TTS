@@ -146,7 +146,24 @@ while State.turn.phase ~= "over" do
     assert(not State.turn.activated[id], "can't end activation before moving")
     sbShipMove(obj, wrong)
     assert(not State.move, "wrong seat can't move the ship")
-    sbShipMove(obj, seat)
+    -- Odd turns use the panel's ship buttons instead of the one on the base (B-002).
+    local use_panel = State.turn.turn % 2 == 1
+    local function panel_slot(prefix)
+      for i = 1, 10 do
+        if ui_values["sbShip" .. i] == prefix .. State.ships[id].name and ui_attrs["sbShip" .. i .. ".active"] == "true" then
+          return _G["uiShipSlot" .. i]
+        end
+      end
+      error("no panel button '" .. prefix .. State.ships[id].name .. "'")
+    end
+    assert(obj.tooltip == false, "ship hover tooltip should be off")
+    if use_panel then
+      panel_slot("Move: ")(Player[wrong]) -- refused: not their ship
+      assert(not State.move, "wrong seat can't move from the panel")
+      panel_slot("Move: ")(Player[seat])
+    else
+      sbShipMove(obj, seat)
+    end
     assert(State.move and not obj.locked and obj.buttons[2].label == "Moving")
 
     local turn_no = State.turn.turn
@@ -224,7 +241,7 @@ while State.turn.phase ~= "over" do
 
     sbShipDone(obj, wrong) -- wrong seat is refused
     assert(not State.turn.activated[id], "wrong seat should not activate")
-    sbShipDone(obj, seat)
+    if use_panel then panel_slot("Done: ")(Player[seat]) else sbShipDone(obj, seat) end
     assert(State.turn.activated[id], "ship should be activated")
     assert(obj.buttons[2].label == "Activated")
   elseif phase == "wind" then

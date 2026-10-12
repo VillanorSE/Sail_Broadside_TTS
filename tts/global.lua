@@ -152,6 +152,27 @@ local function fleet_text()
   return table.concat(lines, "\n")
 end
 
+-- Ship buttons on the screen panel: slot index -> ship GUID, rebuilt on refresh.
+local slot_ships = {}
+
+local function ship_slot_labels()
+  slot_ships = {}
+  local labels = {}
+  local t = State.turn
+  if t.phase == turn.ACTIVATION and not State.move then
+    local waiting = {}
+    for _, id in ipairs(turn.remaining(t, t.current)) do waiting[id] = true end
+    for _, s in ipairs(ships_in_order()) do
+      if waiting[s.id] and #slot_ships < config.tts.ship_slots then
+        slot_ships[#slot_ships + 1] = s.id
+        labels[#labels + 1] = (s.moved and "Done: " or "Move: ") .. s.name
+      end
+    end
+  end
+  for i = #labels + 1, config.tts.ship_slots do labels[i] = "" end
+  return labels
+end
+
 local function button_state(s)
   if State.move and State.move.ship == s.id then return ships_view.BUTTONS.moving end
   if State.turn.activated[s.id] then return ships_view.BUTTONS.activated end
@@ -268,6 +289,7 @@ local function refresh()
     active = active,
     log = table.concat(State.log, "\n"),
     fleet = fleet_text(),
+    ship_slots = ship_slot_labels(),
     buttons = {
       sbBtnSetup = t.phase == turn.SETUP,
       sbBtnInit = t.phase == turn.INITIATIVE,
@@ -281,7 +303,7 @@ local function refresh()
 end
 
 local function rebuild_ui()
-  ui.build(pick_dropdowns())
+  ui.build(pick_dropdowns(), config.tts.ship_slots)
   refresh()
 end
 
@@ -413,6 +435,17 @@ function sbShipDone(obj, player_color)
 end
 
 function sbNoop() end
+
+-- Panel ship buttons do what the button on the base would: Move, then Done.
+for i = 1, config.tts.ship_slots do
+  _G["uiShipSlot" .. i] = function(player)
+    local id = slot_ships[i]
+    local obj = id and getObjectFromGUID(id)
+    local s = id and State.ships[id]
+    if not (obj and s) then return end
+    if s.moved then sbShipDone(obj, player.color) else sbShipMove(obj, player.color) end
+  end
+end
 
 -- Moving ------------------------------------------------------------------
 

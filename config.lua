@@ -118,6 +118,7 @@ return {
     log_lines = 8,
     label_scale = 0.5, -- size of ship name labels; tune in game
     done_scale = 1.5,  -- size of the Done button on ship bases
+    ship_slots = 10,   -- Move/Done buttons on the panel (max ships per side shown)
     wind_indicator = { x = 30, z = 18, length = 5 },
   },
 }
